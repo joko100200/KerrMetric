@@ -1,12 +1,12 @@
 program main
 implicit none
 
-integer :: error,T,i,ttemp,cut
+integer :: error,T,i,ttemp,cut,temptemp
 real*8,dimension(20) :: connection
 real*8,dimension(2) :: r,theta,phi,vr,vtheta,vphi
-real*8 :: ar, atheta, aphi, vtemp, a
-real*8 :: dt,x0,y0,z0,v01,v02,v03,M,boxsize,J
-namelist /inputs/ dt,x0,y0,z0,v01,v02,v03,M,J
+real*8 :: ar, atheta, aphi, vtemp, a, E, delta, phiterm
+real*8 :: dt,r0,theta0,phi0,v01,v02,v03,M,boxsize,J, tc
+namelist /inputs/ dt,r0,theta0,phi0,v01,v02,v03,M,J
 namelist /simspecs/ boxsize,T,cut
 
 open(10,file='propagator/parameter.inp',status='old',&
@@ -27,14 +27,17 @@ connection(:) = 0.d0 !Initializing connection array to 0
 !v01,v02,v03 initial velocity in r theta and phi respecivly
 !ttemp is a temp variable for the cutting procedure
 !connection array stores connections look at subroutine at bottom for further info
-
+!a is the angular momentum per unit mass
+!E and delta are length scales
+!J is angular momentum
+!tc is timecorrection since we are integrating over coordinate time and not proper time
 
 a = J/M
 
-!Converting initial cartisian coords into spherical for the sim
-r(1) = sqrt(x0*x0+y0*y0+z0*z0)
-theta(1) = acos(z0/r(1))
-phi(1) = y0/abs(y0)*acos(x0/sqrt(x0*x0+y0*y0))
+!Initial conditions into arrays
+r(1) = r0
+theta(1) = theta0
+phi(1) = phi0
 
 !Radius check (shouldn't be in the blackhole)
 if(r(1)<=2.d0*M) then
@@ -42,22 +45,23 @@ write(*,*) "Initial radius inside black hole"
 stop
 endif
 
-
-!Converting initial cartisian velocity into spherical
-!This would require taking the inverse of the spherical jacobian and I'm to lazy
-!So for now all velocity components must be given in spherical
+!Initial conditions into arrays
 vr(1) = v01
 vtheta(1) = v02
 vphi(1) = v03
 
 !Velocity Checking should be less than c which is 1
-vtemp = sqrt(vr(1)**2+(r(1)**2)*(vtheta(1)**2+(sin(theta(1))**2)*vphi(1)**2))
+E = r(1)*r(1)+a*a*cos(theta(1))*cos(theta(1))
+delta = r(1)*r(1)-2.d0*M*r(1)+a*a
+phiterm = (sin(theta(1))*sin(theta(1)))*(r(1)*r(1)+a*a+((2.d0*M*r(1)*a*a)/E)*sin(theta(1))*sin(theta(1))) !g33
+vtemp = sqrt(E/delta*vr(1)*vr(1)+E*vtheta(1)*vtheta(1)+phiterm*vphi(1)*vphi(1))
 write(*,*) "Initial velocity is (units of c)"
 write(*,*) vtemp
 if(vtemp >= 1.d0) then
 write(*,*) "initial velocity faster than light lmaoo"
 stop
 endif
+
 
 
 open(11,file='rthetaphi.out',status='unknown',action='write',position='rewind')
@@ -67,12 +71,19 @@ write(11,*) r(1),theta(1),phi(1) !Writing initial coords to file
 do i = 1, T, 1
 call connections(connection,r(1),theta(1),M,a) !Calling connections at point in space
 
+!---Time Correction---!
+!Since this integrator is propegating using coordinate time it needs an additional 
+tc = 2.d0*(connection(2)*vr(1)+connection(3)*vtheta(1)+connection(9)*vr(1)*vtheta(1)+connection(20)*vtheta(1)*vphi(1)) 
+
 !---Radial Integration---!
-ar = -connection(2)+3.d0*connection(1)*vr(1)*vr(1)-connection(3)*vtheta(1)*vtheta(1)&
--connection(5)*vphi(1)*vphi(1)
+ar = -connection(1)-2.d0*(connection(4)*vphi(1)+connection(6)*vr(1)*vtheta(1))-connection(5)*vr(1)*vr(1)&
+-connection(7)*vtheta(1)*vtheta(1)-connection(11)*vphi(1)*vphi(1)+tc*vr(1)
 vr(2) = ar*dt+vr(1)
 r(2) = vr(2)*dt+r(1)
 
+do temptemp = 1, 20
+write(*,*) temptemp,connection(temptemp)
+enddo
 !Inside black hole checker
 if(r(2) <= 2.d0*M) then
 write(*,*) "Fell into black hole"
@@ -83,18 +94,21 @@ endif
 
 !Out of box checker
 if(r(2)>boxsize) then
+write(*,*) r(2)
 ttemp = int(i/cut)
 close(11)
 goto 50
 endif
 
 !---Theta Integration---!
-atheta = -connection(6)*vphi(1)*vphi(1)+2.d0*vtheta(1)*vr(1)*(connection(1)-connection(4))
+atheta = -connection(12)*vphi(1)*vphi(1)-connection(13)-2.d0*(connection(16)*vphi(1)+connection(18)*vtheta(1)*vr(1))&
+-connection(17)*vr(1)*vr(1)-connection(19)*vtheta(1)*vtheta(1)+tc*vtheta(1)
 vtheta(2)=atheta*dt+vtheta(1)
 theta(2)=vtheta(2)*dt+theta(1)
 
 !---Phi Integration---!
-aphi = 2.d0*(vr(1)*vphi(1)*(connection(1)-connection(4))-vtheta(1)*vphi(1)*connection(7))
+aphi = -2.d0*(connection(8)*vtheta(1)*vphi(1)+connection(10)*vr(1)*vphi(1)+connection(14)*vr(1)+connection(15)*vtheta(1))&
++tc*vphi(1)
 vphi(2)=aphi*dt+vphi(1)
 phi(2)=vphi(2)*dt+phi(1)
 
@@ -123,7 +137,7 @@ if(error .ne. 0) stop
 open(12,file='xyz.out',status='unknown',action='write')
 do i=1,ttemp,1
 read(11,*)r(1),theta(1),phi(1)
-write(12,*)r(1)*sin(theta(1))*cos(phi(1)),r(1)*sin(theta(1))*sin(phi(1)),r(1)*cos(theta(1))
+write(12,*)sqrt(r(1)*r(1)+a*a)*sin(theta(1))*cos(phi(1)),sqrt(r(1)*r(1)+a*a)*sin(theta(1))*sin(phi(1)),r(1)*cos(theta(1))
 enddo
 close(12)
 close(11)
