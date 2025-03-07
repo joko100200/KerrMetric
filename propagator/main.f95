@@ -81,20 +81,21 @@ ar = -connection(1)-2.d0*(connection(4)*vphi(1)+connection(6)*vr(1)*vtheta(1))-c
 vr(2) = ar*dt+vr(1)
 r(2) = vr(2)*dt+r(1)
 
-do temptemp = 1, 20
-write(*,*) temptemp,connection(temptemp)
-enddo
+!do temptemp = 1, 20
+!write(*,*) temptemp,connection(temptemp)
+!enddo
+!stop
 !Inside black hole checker
 if(r(2) <= 2.d0*M) then
 write(*,*) "Fell into black hole"
-write(*,*) "Integration terminated"
+ttemp = int(i/cut)
 close(11)
-stop
+goto 50
 endif
 
 !Out of box checker
 if(r(2)>boxsize) then
-write(*,*) r(2)
+write(*,*) "Escaped box"
 ttemp = int(i/cut)
 close(11)
 goto 50
@@ -153,25 +154,25 @@ real*8 :: rs, invr, E, delta, invE, invdelta, costheta, sintheta
 
 costheta = cos(theta)
 sintheta = sin(theta)
-E = r*r + a*a*costheta
+E = r*r + a*a*costheta*costheta
 invE = 1.d0/E
 rs = 2.d0*M
 delta = r*r - rs*r + a*a
 invdelta = 1.d0/delta
 
-connection(1) = rs*delta*(r*r-a*a*costheta*costheta)*0.5d0*invE**3 
+connection(1) = (rs*delta*(r*r-a*a*costheta*costheta))*0.5d0*invE**3 
 connection(2) = rs*(r*r+a*a)*(r*r-a*a*costheta*costheta)*0.5d0*(invE**2)*invdelta
 connection(3) = -rs*a*a*r*sintheta*costheta*invE*invE
 connection(4) = delta*rs*a*sintheta*sintheta*(r*r-a*a*costheta*costheta)*0.5d0*invE**3
-connection(5) = 2.d0*r*a*a*sintheta*sintheta-rs*(r*r-a*a*costheta)*0.5d0*invE*invdelta
+connection(5) = (2.d0*r*a*a*sintheta*sintheta-rs*(r*r-a*a*costheta*costheta))*0.5d0*invE*invdelta
 connection(6) = -a*a*sintheta*costheta*invE
 connection(7) = -r*delta*invE
-connection(8) = (costheta/sintheta)*invE**2*(E*E+rs*a*a*r*sintheta*sintheta) 
+connection(8) = (costheta/sintheta)*(invE**2)*(E*E+rs*a*a*r*sintheta*sintheta) 
 connection(9) = rs*a*sintheta*sintheta*(a*a*costheta*costheta*(a*a-r*r)-r*r*(a*a+3.d0*r*r))*0.5d0*invE*invE*invdelta
 connection(10) = (2.d0*r*E*E+rs*((a**4)*sintheta*sintheta*costheta*costheta-r*r*(E+r*r+a*a)))*0.5d0*invE*invE*invdelta
-connection(11) = delta*sintheta*sintheta*0.5d0*(invE**3)*(-2.d0*r*E*E+rs*a*a*sintheta*sintheta*(r*r-a*a*costheta*costheta))
-connection(12) = -sintheta*costheta*(invE**3)*((r*r+a*a)**2-a*a*delta*sintheta*sintheta)*E+(r*r+a*a)*rs*a*a*r*sintheta*sintheta
-connection(13) = rs*a*a*r*sintheta*costheta*(invE**3) 
+connection(11) = (delta*sintheta*sintheta*0.5d0*invE*invE*invE)*(-2.d0*r*E*E+rs*a*a*sintheta*sintheta*(r*r-a*a*costheta*costheta))
+connection(12) = -(sintheta*costheta)*(invE**3)*(((r*r+a*a)**2-a*a*delta*sintheta*sintheta)*E+(r*r+a*a)*rs*a*a*r*sintheta*sintheta)
+connection(13) = -rs*a*a*r*sintheta*costheta*(invE**3) 
 connection(14) = rs*a*(r*r-a*a*costheta*costheta)*0.5d0*invE*invE*invdelta
 connection(15) = -rs*a*r*(costheta/sintheta)*invE*invE 
 connection(16) = rs*a*r*(r*r+a*a)*sintheta*costheta*(invE**3)
