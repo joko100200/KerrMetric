@@ -1,10 +1,10 @@
-This code is an geodesic integrator on the kerr metric. Simply takes in initial variables and outputs orbit.
+This code is an geodesic integrator on the kerr metric. Simply it takes in initial parameters for an orbiting particle, such as its coordinate position and velocity. It also takes in angular momentum J and mass M of the blackhole.   
 
-The simulation is in geometric units where c=G=1
+The code is in geometric units where c=G=1
 
 Code Organization: <br>
 In the propagator folder there are two files main.f95 and paramater.inp. main.f95 holds all the code for running the simulation while paramater.inp hold all input variables the simulation needs to run.
-For an explination on variables look at variable description comment in main.
+For an explination on variables look at variable description comment in main. <br>
 
 Code Outputs:<br>
 Code will output two files rthetaphi.out and xyz.out. rthetaphi.out are the outputted in Boyer-Lindquist coordinates (r,theta,phi). These are the coordinates used in the integration. The other output file, xyz.out, are the sudo cartisan coordinates which are only there for plotting reasons. The conversion happens in main.f95 and follow these equations. <br>
