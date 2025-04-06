@@ -3,9 +3,10 @@ implicit none
 
 integer :: error,T,i,ttemp,cut,temptemp
 real*8,dimension(20) :: connection
+real*8,dimension(5) :: metric
 real*8,dimension(2) :: r,theta,phi,vr,vtheta,vphi
 real*8 :: ar, atheta, aphi, vtemp, a, E, delta, phiterm
-real*8 :: dt,r0,theta0,phi0,v01,v02,v03,M,boxsize,J, tc
+real*8 :: dt,r0,theta0,phi0,v01,v02,v03,M,boxsize,J, tc, tau=0.d0
 namelist /inputs/ dt,r0,theta0,phi0,v01,v02,v03,M,J
 namelist /simspecs/ boxsize,T,cut
 
@@ -16,6 +17,7 @@ read(10,inputs)
 read(10,simspecs)
 close(10)
 
+metric(:) = 0.d0
 connection(:) = 0.d0 !Initializing connection array to 0
 
 !------Variable Explinations------!
@@ -67,6 +69,10 @@ endif
 open(11,file='rthetaphi.out',status='unknown',action='write',position='rewind')
 write(11,*) r(1),theta(1),phi(1) !Writing initial coords to file
 
+call metrics(metric,r(1),theta(1),M,a)
+tau = tau + sqrt(-(metric(1)+2.d0*metric(2)*vphi(1)+metric(3)*vr(1)**2+metric(4)*vtheta(1)**2+metric(5)*vphi(1)**2))*dt
+
+
 !------------Integration loop------------!
 do i = 1, T, 1
 call connections(connection,r(1),theta(1),M,a) !Calling connections at point in space
@@ -81,10 +87,6 @@ ar = -connection(1)-2.d0*(connection(4)*vphi(1)+connection(6)*vr(1)*vtheta(1))-c
 vr(2) = ar*dt+vr(1)
 r(2) = vr(2)*dt+r(1)
 
-!do temptemp = 1, 20
-!write(*,*) temptemp,connection(temptemp)
-!enddo
-!stop
 !Inside black hole checker
 if(r(2) <= 2.d0*M) then
 write(*,*) "Fell into black hole"
@@ -119,6 +121,10 @@ if(mod(i,cut) .eq. 0) then
 write(11,*) r(2),theta(2),phi(2)
 endif
 
+!---ProperTimeCalculation---!
+call metrics(metric, r(2), theta(2), M, a)
+tau = tau + sqrt(-(metric(1)+2.d0*metric(2)*vphi(2)+metric(3)*vr(2)**2+metric(4)*vtheta(2)**2+metric(5)*vphi(2)**2))*dt
+
 !updating variables for new step
 vr(1)=vr(2)
 r(1)=r(2)
@@ -127,9 +133,13 @@ theta(1)=theta(2)
 vphi(1)=vphi(2)
 phi(1)=phi(2)
 connection(:) = 0.d0
+metric(:) = 0.d0
 enddo
 close(11) !Closing output file
 
+!Writing proper time
+write(*,*) "Proper time | Sim time | Ratio"
+write(*,*) tau,T*dt, tau/(T*dt)
 
 !---rthetaphi->xyz---!
 ttemp = int(T/cut)
@@ -144,6 +154,31 @@ close(12)
 close(11)
 
 end program main
+
+
+!Metric subroutine
+subroutine metrics(metric,r,theta,M,a)
+real*8, intent(in) :: r, theta, M, a
+real*8, intent(out), dimension(5) :: metric
+real*8 :: rs, invr, E, delta, invE, sintheta
+
+
+E = r*r + a*a*cos(theta)*cos(theta)
+invr = 1.d0/r
+rs = 2.d0*M
+sintheta = sin(theta)
+delta = r*r-rs*r+a*a
+
+metric(1) = -(1.d0-rs*r/E) 
+metric(2) = -rs*r*a*sintheta*sintheta/E
+metric(3) = E/delta
+metric(4) = E
+metric(5) = (r*r+a*a+(rs*r*a*a)/E*sintheta*sintheta)*sintheta*sintheta
+
+!(1) = 00; (2)=03,30; (3)=11; (4)=22 ;(5)=33
+end subroutine metrics
+
+
 
 
 !Connection subroutine
